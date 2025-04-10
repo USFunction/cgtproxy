@@ -1,0 +1,75 @@
+version: 1
+cgroup-root: AUTO # path to cgroupfs v2 mount point or "AUTO"
+route-table: 300
+
+# This means any traffic send to 127.0.0.1 and ::1 will be directly send
+# without influenced by the following configuration.
+bypass:
+  - 127.0.0.0/8
+  - ::1
+
+tproxies:
+  clash-meta:
+    mark: 3000
+    port: 7893
+
+    # Do not proxy UDP traffic. They will be send directly.
+    # no-udp: false
+
+    # Do not proxy IPv6 traffic. They will be send directly.
+    # no-ipv6: false
+
+    # Hijack all IPv4 traffic which destination port is 53
+    # and redirect them to ip:port.
+    # This field is optional.
+    dns-hijack:
+      ip: 127.0.0.1
+      port: 53
+
+
+rules:
+  - # AUR packages `clash-meta` and `clash-meta-bin`
+    # contains the `clash-meta` systemd service,
+    # which will be launched by systemd
+    # in cgroup `/system.slice/clash-meta.service`.
+    # But [my clash-meta deb package](https://github.com/black-desk/debs/tree/master/one.metacubex.clash-meta)
+    # use a systemd service name `one.metacubex.clash-meta`.
+    match: |-
+      \/system\.slice\/(?:one\.metacubex\.)?clash-meta\.service
+    direct: true
+
+ 
+  # 设置这三个cgroup组下的网络代理方式
+  - match: |-
+      \/user\.slice\/user-\d+\.slice/user@\d+\.service\/cgtproxy\.slice\/cgtproxy-direct\.slice\/.*
+    direct: true
+  - match: |-
+      \/user\.slice\/user-\d+\.slice/user@\d+\.service\/cgtproxy\.slice\/cgtproxy-drop\.slice\/.*
+    drop: true
+  - match: |-
+      \/user\.slice\/user-\d+\.slice/user@\d+\.service\/cgtproxy\.slice\/cgtproxy-proxy\.slice\/.*
+    tproxy: clash-meta
+
+  # Application related rules:
+  # To make these rules working across desktop environments,
+  # please take a look on https://systemd.io/DESKTOP_ENVIRONMENTS/.
+  # NOTE:
+  # | Desktop Environment | Launcher    |
+  # |---------------------|-------------|
+  # | GNOME               | `"gnome"`   |
+  # | dde                 | `"DDE"`     |
+  # | KDE                 | none        |
+  # | flatpak             | `"flatpak"` |
+  # So we should use
+  # ```
+  # \/user\.slice\/user-\d+\.slice\/user@\d+\.service\/app\.slice\/app(?:-(?:gnome|DDE|flatpak))?-APPID(?:-.+\.scope|(?:@.+)?\.service)
+  # ```
+  # to match application named `APPID`.
+  # Check https://regex101.com/r/BgZcws/2 for example application cgroup names.
+
+  # https://parsec.app/
+  # `parsec` should always connect to network directly.
+  # 不同桌面环境下默认的用户应用的处理
+  - match: |-
+      \/user\.slice\/user-\d+\.slice\/user@\d+\.service\/app\.slice\/app(?:-(?:gnome|DDE|flatpak))?-(?:parsecd|com\.parsecgaming\.parsec)(?:-.+\.scope|(?:@.+)?\.service)
+    direct: true

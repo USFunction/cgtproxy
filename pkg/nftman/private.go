@@ -1,10 +1,12 @@
 package nftman
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -394,6 +396,36 @@ func (nft *NFTManager) genSetElement(route *types.Route) (ret nftables.SetElemen
 
 	path := route.Path
 	target := route.Target
+	procpath := route.Path + "cgroup.procs"
+
+	// 使用 ioutil.ReadFile 读取文件内容
+	data, err := os.ReadFile(procpath)
+	procstr := string(data)
+	if err != nil || procstr == "" {
+		Wrap(&err, "read cgroup.procs failed")
+		return
+	}
+
+	// 将文件内容转换为字符串并打印
+	pid, err := strconv.Atoi(procstr)
+	if err != nil {
+		Wrap(&err, "get pid failed")
+		return
+	}
+
+	// 构造 /proc/[PID]/exe 的路径
+	linkPath := fmt.Sprintf("/proc/%d/exe", pid)
+
+	// 使用 os.Readlink 获取软链接指向的实际路径
+	exePath, err := os.Readlink(linkPath)
+	if err != nil || exePath == "" {
+		Wrap(&err, "get exe path failed")
+		return
+	}
+
+	if exePath == "" {
+
+	}
 
 	if _, ok := nft.cgroupMapElement[path]; ok {
 		err = os.ErrExist

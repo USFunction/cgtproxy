@@ -1,0 +1,3 @@
+{
+    "terminal.integrated.env.windows": { "Path": "${env:Path};C:\\Go\\bin" }
+}
